@@ -21,7 +21,7 @@ const COLORS = {
   S: '#4ade80',
   T: '#c084fc',
   Z: '#f87171'
-};
+}; 
 
 const SHAPES = { 
   I: [[1, 1, 1, 1]],
