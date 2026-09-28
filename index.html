@@ -9,8 +9,8 @@
   <body>
     <div class="game-shell">
       <div class="board-column left-column">
-        <div class="board-label">Player 2</div>
-        <canvas id="mirror" width="300" height="600" aria-label="Opponent board"></canvas>
+        <div class="board-label">Player 1</div>
+        <canvas id="game" width="300" height="600" aria-label="Current board"></canvas>
       </div>
 
       <div class="panel score-panel">
@@ -29,25 +29,51 @@
             <strong id="level">1</strong>
           </div>
         </div>
-        <div class="next-box">
-          <h2>Next</h2>
-          <canvas id="next" width="120" height="120" aria-label="Next piece preview"></canvas>
-        </div>
-        <div class="controls">
-          <h2>Controls</h2>
-          <ul>
-            <li>← / → move</li>
-            <li>↑ rotate</li>
-            <li>↓ soft drop</li>
-            <li>Space hard drop</li>
-          </ul>
+        <div class="mini-panel-grid">
+          <div class="next-box">
+            <h2>Next</h2>
+            <div class="next-split">
+              <div class="next-card">
+                <span>P1</span>
+                <canvas id="next" width="120" height="120" aria-label="Next piece preview"></canvas>
+              </div>
+              <div class="next-card">
+                <span>P2</span>
+                <canvas id="next2" width="120" height="120" aria-label="Player 2 next piece preview"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="controls">
+            <h2>Controls</h2>
+            <div class="controls-grid">
+              <div class="player-controls">
+                <h3>Player 1</h3>
+                <ul>
+                  <li>A / D move</li>
+                  <li>W rotate</li>
+                  <li>Ctrl hard drop</li>
+                  <li>S soft drop</li>
+                </ul>
+              </div>
+              <div class="player-controls">
+                <h3>Player 2</h3>
+                <ul>
+                  <li>→ / ← move</li>
+                  <li>↑ rotate</li>
+                  <li>↓ soft drop</li>
+                  <li>Space hard drop</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
         <button id="restartBtn">New Game</button>
       </div>
 
       <div class="board-column right-column">
-        <div class="board-label">Player 1</div>
-        <canvas id="game" width="300" height="600" aria-label="Current board"></canvas>
+        <div class="board-label">Player 2</div>
+        <canvas id="mirror" width="300" height="600" aria-label="Opponent board"></canvas>
       </div>
     </div>
 

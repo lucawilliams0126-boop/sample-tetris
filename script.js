@@ -1,14 +1,16 @@
 const canvas = document.getElementById('game');
 const mirrorCanvas = document.getElementById('mirror');
 const nextCanvas = document.getElementById('next');
+const nextCanvas2 = document.getElementById('next2');
 
-if (!canvas || !nextCanvas) {
+if (!canvas || !nextCanvas || !nextCanvas2) {
   throw new Error('Missing required game canvas elements.');
 }
 
 const context = canvas.getContext('2d');
 const mirrorContext = mirrorCanvas ? mirrorCanvas.getContext('2d') : null;
 const nextContext = nextCanvas.getContext('2d');
+const nextContext2 = nextCanvas2.getContext('2d');
 
 const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
@@ -97,6 +99,7 @@ function spawnPiece(player) {
   if (collides(player.board, player.currentPiece, player.currentPiece.x, player.currentPiece.y)) {
     player.running = false;
   }
+  drawNextPiece();
 }
 
 function collides(boardState, piece, offsetX, offsetY) {
@@ -262,19 +265,31 @@ function drawBoard(player, targetContext, mirrored = false) {
   }
 }
 
-function drawNextPiece() {
-  nextContext.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-  const matrix = playerA.nextPiece.matrix;
-  const offsetX = Math.floor((nextCanvas.width / BLOCK_SIZE - matrix[0].length) / 2);
-  const offsetY = Math.floor((nextCanvas.height / BLOCK_SIZE - matrix.length) / 2);
+function drawSinglePreview(canvasRef, contextRef, piece) {
+  contextRef.clearRect(0, 0, canvasRef.width, canvasRef.height);
+  if (!piece) return;
+
+  const matrix = piece.matrix;
+  const offsetX = Math.floor((canvasRef.width / BLOCK_SIZE - matrix[0].length) / 2);
+  const offsetY = Math.floor((canvasRef.height / BLOCK_SIZE - matrix.length) / 2);
 
   matrix.forEach((row, y) => {
     row.forEach((value, x) => {
       if (value) {
-        drawCell(offsetX + x, offsetY + y, COLORS[playerA.nextPiece.type], nextContext);
+        drawCell(offsetX + x, offsetY + y, COLORS[piece.type], contextRef);
       }
     });
   });
+}
+
+function drawNextPiece() {
+  if (playerA && playerA.nextPiece) {
+    drawSinglePreview(nextCanvas, nextContext, playerA.nextPiece);
+  }
+
+  if (playerB && playerB.nextPiece) {
+    drawSinglePreview(nextCanvas2, nextContext2, playerB.nextPiece);
+  }
 }
 
 function updateWorld(delta) {
@@ -308,34 +323,72 @@ function tick(time = 0) {
 }
 
 function handleKeydown(event) {
-  if (!playerA || !playerA.running) {
-    if (event.code === 'Space' || event.code === 'ArrowUp') {
-      resetGame();
+  const code = event.code;
+
+  if (code === 'KeyA' || code === 'KeyD' || code === 'KeyW' || code === 'KeyS' || code === 'ControlLeft' || code === 'ControlRight') {
+    if (!playerA || !playerA.running) {
+      if (code === 'KeyW' || code === 'KeyS' || code === 'ControlLeft' || code === 'ControlRight') {
+        resetGame();
+      }
+      return;
+    }
+
+    switch (code) {
+      case 'KeyA':
+        movePiece(playerA, -1, 0);
+        break;
+      case 'KeyD':
+        movePiece(playerA, 1, 0);
+        break;
+      case 'KeyW':
+        rotatePiece(playerA);
+        break;
+      case 'KeyS':
+        if (movePiece(playerA, 0, 1)) {
+          playerA.score += 1;
+        }
+        updateHud();
+        break;
+      case 'ControlLeft':
+      case 'ControlRight':
+        hardDrop(playerA);
+        break;
+      default:
+        break;
     }
     return;
   }
 
-  switch (event.code) {
-    case 'ArrowLeft':
-      movePiece(playerA, -1, 0);
-      break;
-    case 'ArrowRight':
-      movePiece(playerA, 1, 0);
-      break;
-    case 'ArrowDown':
-      if (movePiece(playerA, 0, 1)) {
-        playerA.score += 1;
+  if (code === 'ArrowLeft' || code === 'ArrowRight' || code === 'ArrowUp' || code === 'ArrowDown' || code === 'Space') {
+    if (!playerB || !playerB.running) {
+      if (code === 'ArrowUp' || code === 'Space') {
+        resetGame();
       }
-      updateHud();
-      break;
-    case 'ArrowUp':
-      rotatePiece(playerA);
-      break;
-    case 'Space':
-      hardDrop(playerA);
-      break;
-    default:
-      break;
+      return;
+    }
+
+    switch (code) {
+      case 'ArrowLeft':
+        movePiece(playerB, 1, 0);
+        break;
+      case 'ArrowRight':
+        movePiece(playerB, -1, 0);
+        break;
+      case 'ArrowDown':
+        if (movePiece(playerB, 0, 1)) {
+          playerB.score += 1;
+        }
+        updateHud();
+        break;
+      case 'ArrowUp':
+        rotatePiece(playerB);
+        break;
+      case 'Space':
+        hardDrop(playerB);
+        break;
+      default:
+        break;
+    }
   }
 }
 
