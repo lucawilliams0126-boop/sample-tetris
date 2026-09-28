@@ -28,17 +28,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 44px;
-  width: calc(100% - 120px);
-  max-width: 1320px;
-  min-width: 960px;
+  gap: clamp(20px, 3vw, 44px);
+  width: min(96vw, 1220px);
+  max-width: 1220px;
   background: rgba(18, 26, 45, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 18px;
   box-shadow: 0 18px 45px var(--shadow);
-  padding: 24px;
-  transform: scaleX(1.2);
-  transform-origin: center;
+  padding: clamp(16px, 2vw, 24px);
 }
 
 .board-column {
@@ -46,6 +43,16 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
+}
+
+.left-column {
+  position: relative;
+  left: -20px;
+}
+
+.right-column {
+  position: relative;
+  right: -20px;
 }
 
 .board-label {
@@ -56,7 +63,8 @@ body {
 }
 
 .panel {
-  width: 216px;
+  width: min(22vw, 216px);
+  min-width: 180px;
   text-align: center;
 }
 
@@ -140,6 +148,8 @@ canvas {
 .next-box {
   margin-bottom: 18px;
   text-align: center;
+  position: relative;
+  left: -40px;
 }
 
 .next-split {
