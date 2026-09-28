@@ -8,7 +8,12 @@
   </head>
   <body>
     <div class="game-shell">
-      <div class="panel left-panel">
+      <div class="board-column left-column">
+        <div class="board-label">Player 2</div>
+        <canvas id="mirror" width="300" height="600" aria-label="Opponent board"></canvas>
+      </div>
+
+      <div class="panel score-panel">
         <h1>TETRIS</h1>
         <div class="score-box">
           <div>
@@ -24,12 +29,6 @@
             <strong id="level">1</strong>
           </div>
         </div>
-        <button id="restartBtn">New Game</button>
-      </div>
-
-      <canvas id="game" width="300" height="600" aria-label="Tetris board"></canvas>
-
-      <div class="panel right-panel">
         <div class="next-box">
           <h2>Next</h2>
           <canvas id="next" width="120" height="120" aria-label="Next piece preview"></canvas>
@@ -43,6 +42,12 @@
             <li>Space hard drop</li>
           </ul>
         </div>
+        <button id="restartBtn">New Game</button>
+      </div>
+
+      <div class="board-column right-column">
+        <div class="board-label">Player 1</div>
+        <canvas id="game" width="300" height="600" aria-label="Current board"></canvas>
       </div>
     </div>
 

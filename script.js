@@ -1,6 +1,13 @@
 const canvas = document.getElementById('game');
-const context = canvas.getContext('2d');
+const mirrorCanvas = document.getElementById('mirror');
 const nextCanvas = document.getElementById('next');
+
+if (!canvas || !nextCanvas) {
+  throw new Error('Missing required game canvas elements.');
+}
+
+const context = canvas.getContext('2d');
+const mirrorContext = mirrorCanvas ? mirrorCanvas.getContext('2d') : null;
 const nextContext = nextCanvas.getContext('2d');
 
 const scoreEl = document.getElementById('score');
@@ -21,9 +28,9 @@ const COLORS = {
   S: '#4ade80',
   T: '#c084fc',
   Z: '#f87171'
-}; 
+};
 
-const SHAPES = { 
+const SHAPES = {
   I: [[1, 1, 1, 1]],
   J: [[1, 0, 0], [1, 1, 1]],
   L: [[0, 0, 1], [1, 1, 1]],
@@ -33,16 +40,9 @@ const SHAPES = {
   Z: [[1, 1, 0], [0, 1, 1]]
 };
 
-let board;
-let currentPiece;
-let nextPiece;
-let score;
-let lines;
-let level;
-let dropInterval;
-let lastTime;
-let dropCounter;
-let running = false;
+let playerA;
+let playerB;
+let lastTime = 0;
 
 function createMatrix(width, height) {
   return Array.from({ length: height }, () => Array(width).fill(EMPTY));
@@ -55,39 +55,48 @@ function cloneMatrix(matrix) {
 function randomPiece() {
   const types = Object.keys(SHAPES);
   const type = types[Math.floor(Math.random() * types.length)];
-  const matrix = cloneMatrix(SHAPES[type]);
   return {
     type,
-    matrix,
-    x: Math.floor((COLS - matrix[0].length) / 2),
+    matrix: cloneMatrix(SHAPES[type]),
+    x: Math.floor((COLS - SHAPES[type][0].length) / 2),
     y: -1
   };
 }
 
-function resetGame() {
-  board = createMatrix(COLS, ROWS);
-  nextPiece = randomPiece();
-  score = 0;
-  lines = 0;
-  level = 1;
-  dropInterval = 700;
-  lastTime = 0;
-  dropCounter = 0;
-  currentPiece = null;
-  setPiece();
-  updateHud();
-  running = true;
+function createPlayerState() {
+  return {
+    board: createMatrix(COLS, ROWS),
+    currentPiece: null,
+    nextPiece: randomPiece(),
+    score: 0,
+    lines: 0,
+    level: 1,
+    dropInterval: 700,
+    dropCounter: 0,
+    running: false
+  };
 }
 
-function setPiece() {
-  currentPiece = nextPiece;
-  currentPiece.x = Math.floor((COLS - currentPiece.matrix[0].length) / 2);
-  currentPiece.y = -1;
-  nextPiece = randomPiece();
-  if (collides(board, currentPiece, currentPiece.x, currentPiece.y)) {
-    endGame();
-  }
+function resetGame() {
+  playerA = createPlayerState();
+  playerB = createPlayerState();
+
+  playerA.running = true;
+  playerB.running = true;
+  spawnPiece(playerA);
+  spawnPiece(playerB);
+  updateHud();
   drawNextPiece();
+}
+
+function spawnPiece(player) {
+  player.currentPiece = player.nextPiece;
+  player.currentPiece.x = Math.floor((COLS - player.currentPiece.matrix[0].length) / 2);
+  player.currentPiece.y = -1;
+  player.nextPiece = randomPiece();
+  if (collides(player.board, player.currentPiece, player.currentPiece.x, player.currentPiece.y)) {
+    player.running = false;
+  }
 }
 
 function collides(boardState, piece, offsetX, offsetY) {
@@ -111,37 +120,37 @@ function collides(boardState, piece, offsetX, offsetY) {
   return false;
 }
 
-function mergeBoard() {
-  currentPiece.matrix.forEach((row, y) => {
+function mergeBoard(player) {
+  player.currentPiece.matrix.forEach((row, y) => {
     row.forEach((value, x) => {
       if (value) {
-        const boardY = y + currentPiece.y;
-        const boardX = x + currentPiece.x;
+        const boardY = y + player.currentPiece.y;
+        const boardX = x + player.currentPiece.x;
         if (boardY >= 0) {
-          board[boardY][boardX] = currentPiece.type;
+          player.board[boardY][boardX] = player.currentPiece.type;
         }
       }
     });
   });
 }
 
-function clearLines() {
+function clearLines(player) {
   let cleared = 0;
 
   for (let y = ROWS - 1; y >= 0; y -= 1) {
-    if (board[y].every((cell) => cell !== EMPTY)) {
-      board.splice(y, 1);
-      board.unshift(Array(COLS).fill(EMPTY));
+    if (player.board[y].every((cell) => cell !== EMPTY)) {
+      player.board.splice(y, 1);
+      player.board.unshift(Array(COLS).fill(EMPTY));
       cleared += 1;
       y += 1;
     }
   }
 
   if (cleared > 0) {
-    lines += cleared;
-    score += [0, 100, 300, 500, 800][cleared] * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(120, 700 - (level - 1) * 60);
+    player.lines += cleared;
+    player.score += [0, 100, 300, 500, 800][cleared] * player.level;
+    player.level = Math.floor(player.lines / 10) + 1;
+    player.dropInterval = Math.max(120, 700 - (player.level - 1) * 60);
     updateHud();
   }
 }
@@ -152,96 +161,101 @@ function rotateMatrix(matrix) {
   );
 }
 
-function rotatePiece() {
-  if (!running) return;
+function rotatePiece(player) {
+  if (!player.running) return;
 
-  const rotated = rotateMatrix(currentPiece.matrix);
-  const nextX = currentPiece.x;
-  const nextY = currentPiece.y;
+  const rotated = rotateMatrix(player.currentPiece.matrix);
+  const nextX = player.currentPiece.x;
+  const nextY = player.currentPiece.y;
 
-  if (!collides(board, { ...currentPiece, matrix: rotated }, nextX, nextY)) {
-    currentPiece.matrix = rotated;
-  } else {
-    const kicks = [1, -1, 2, -2];
-    for (const offset of kicks) {
-      if (!collides(board, { ...currentPiece, matrix: rotated }, nextX + offset, nextY)) {
-        currentPiece.x += offset;
-        currentPiece.matrix = rotated;
-        return;
-      }
+  if (!collides(player.board, { ...player.currentPiece, matrix: rotated }, nextX, nextY)) {
+    player.currentPiece.matrix = rotated;
+    return;
+  }
+
+  const kicks = [1, -1, 2, -2];
+  for (const offset of kicks) {
+    if (!collides(player.board, { ...player.currentPiece, matrix: rotated }, nextX + offset, nextY)) {
+      player.currentPiece.x += offset;
+      player.currentPiece.matrix = rotated;
+      return;
     }
   }
 }
 
-function movePiece(dx, dy) {
-  if (!running) return false;
+function movePiece(player, dx, dy) {
+  if (!player.running) return false;
 
-  if (!collides(board, currentPiece, currentPiece.x + dx, currentPiece.y + dy)) {
-    currentPiece.x += dx;
-    currentPiece.y += dy;
+  if (!collides(player.board, player.currentPiece, player.currentPiece.x + dx, player.currentPiece.y + dy)) {
+    player.currentPiece.x += dx;
+    player.currentPiece.y += dy;
     return true;
   }
 
   if (dy > 0) {
-    lockPiece();
+    lockPiece(player);
   }
 
   return false;
 }
 
-function lockPiece() {
-  mergeBoard();
-  clearLines();
-  setPiece();
+function lockPiece(player) {
+  mergeBoard(player);
+  clearLines(player);
+  spawnPiece(player);
+  if (!player.running && player === playerA) {
+    updateHud();
+  }
 }
 
-function hardDrop() {
-  if (!running) return;
-
-  while (movePiece(0, 1)) {
-    score += 2;
+function hardDrop(player) {
+  if (!player.running) return;
+  while (movePiece(player, 0, 1)) {
+    player.score += 2;
   }
   updateHud();
 }
 
 function updateHud() {
-  scoreEl.textContent = String(score);
-  linesEl.textContent = String(lines);
-  levelEl.textContent = String(level);
+  scoreEl.textContent = String(playerA.score);
+  linesEl.textContent = String(playerA.lines);
+  levelEl.textContent = String(playerA.level);
 }
 
-function drawCell(x, y, color, contextRef = context) {
-  contextRef.fillStyle = color;
-  contextRef.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-  contextRef.strokeStyle = 'rgba(15, 23, 42, 0.8)';
-  contextRef.lineWidth = 1;
-  contextRef.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+function drawCell(x, y, color, targetContext) {
+  targetContext.fillStyle = color;
+  targetContext.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+  targetContext.strokeStyle = 'rgba(15, 23, 42, 0.8)';
+  targetContext.lineWidth = 1;
+  targetContext.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
 }
 
-function drawBoard() {
-  context.clearRect(0, 0, canvas.width, canvas.height);
+function drawBoard(player, targetContext, mirrored = false) {
+  targetContext.clearRect(0, 0, targetContext.canvas.width, targetContext.canvas.height);
 
   for (let y = 0; y < ROWS; y += 1) {
     for (let x = 0; x < COLS; x += 1) {
-      const value = board[y][x];
+      const value = player.board[y][x];
+      const drawX = mirrored ? COLS - 1 - x : x;
+
       if (value !== EMPTY) {
-        drawCell(x, y, COLORS[value]);
+        drawCell(drawX, y, COLORS[value], targetContext);
       } else {
-        context.strokeStyle = 'rgba(148, 163, 184, 0.12)';
-        context.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        targetContext.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+        targetContext.strokeRect(drawX * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
       }
     }
   }
 
-  if (currentPiece) {
-    currentPiece.matrix.forEach((row, y) => {
+  if (player.currentPiece) {
+    player.currentPiece.matrix.forEach((row, y) => {
       row.forEach((value, x) => {
-        if (value) {
-          const drawY = currentPiece.y + y;
-          const drawX = currentPiece.x + x;
-          if (drawY >= 0) {
-            drawCell(drawX, drawY, COLORS[currentPiece.type]);
-          }
+        if (!value) return;
+
+        const drawY = player.currentPiece.y + y;
+        const drawX = mirrored ? COLS - 1 - (player.currentPiece.x + x) : player.currentPiece.x + x;
+        if (drawY >= 0) {
+          drawCell(drawX, drawY, COLORS[player.currentPiece.type], targetContext);
         }
       });
     });
@@ -250,53 +264,51 @@ function drawBoard() {
 
 function drawNextPiece() {
   nextContext.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-
-  const matrix = nextPiece.matrix;
+  const matrix = playerA.nextPiece.matrix;
   const offsetX = Math.floor((nextCanvas.width / BLOCK_SIZE - matrix[0].length) / 2);
   const offsetY = Math.floor((nextCanvas.height / BLOCK_SIZE - matrix.length) / 2);
 
   matrix.forEach((row, y) => {
     row.forEach((value, x) => {
       if (value) {
-        drawCell(
-          offsetX + x,
-          offsetY + y,
-          COLORS[nextPiece.type],
-          nextContext
-        );
+        drawCell(offsetX + x, offsetY + y, COLORS[playerA.nextPiece.type], nextContext);
       }
     });
   });
 }
 
-function endGame() {
-  running = false;
-  context.fillStyle = 'rgba(11, 16, 32, 0.7)';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#e2e8f0';
-  context.font = 'bold 28px Arial';
-  context.textAlign = 'center';
-  context.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+function updateWorld(delta) {
+  if (playerA && playerA.running) {
+    playerA.dropCounter += delta;
+    if (playerA.dropCounter > playerA.dropInterval) {
+      movePiece(playerA, 0, 1);
+      playerA.dropCounter = 0;
+    }
+  }
+
+  if (playerB && playerB.running) {
+    playerB.dropCounter += delta;
+    if (playerB.dropCounter > playerB.dropInterval) {
+      movePiece(playerB, 0, 1);
+      playerB.dropCounter = 0;
+    }
+  }
 }
 
 function tick(time = 0) {
   const delta = time - lastTime;
   lastTime = time;
 
-  if (running) {
-    dropCounter += delta;
-    if (dropCounter > dropInterval) {
-      movePiece(0, 1);
-      dropCounter = 0;
-    }
+  updateWorld(delta);
+  drawBoard(playerA, context, false);
+  if (mirrorContext && playerB) {
+    drawBoard(playerB, mirrorContext, true);
   }
-
-  drawBoard();
   requestAnimationFrame(tick);
 }
 
 function handleKeydown(event) {
-  if (!running) {
+  if (!playerA || !playerA.running) {
     if (event.code === 'Space' || event.code === 'ArrowUp') {
       resetGame();
     }
@@ -305,22 +317,22 @@ function handleKeydown(event) {
 
   switch (event.code) {
     case 'ArrowLeft':
-      movePiece(-1, 0);
+      movePiece(playerA, -1, 0);
       break;
     case 'ArrowRight':
-      movePiece(1, 0);
+      movePiece(playerA, 1, 0);
       break;
     case 'ArrowDown':
-      if (movePiece(0, 1)) {
-        score += 1;
-        updateHud();
+      if (movePiece(playerA, 0, 1)) {
+        playerA.score += 1;
       }
+      updateHud();
       break;
     case 'ArrowUp':
-      rotatePiece();
+      rotatePiece(playerA);
       break;
     case 'Space':
-      hardDrop();
+      hardDrop(playerA);
       break;
     default:
       break;
